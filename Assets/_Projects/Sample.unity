@@ -309,6 +309,7 @@ MonoBehaviour:
   debugNormalImage: {fileID: 1464671937}
   depthImage: {fileID: 729628114}
   model: {fileID: 5022602860645237092, guid: 792576e0698a840f59c672deca1285c1, type: 3}
+  shader: {fileID: 7200000, guid: 204b4820f51aa404f9c9aa56d3eb8333, type: 3}
 --- !u!1 &1464671935
 GameObject:
   m_ObjectHideFlags: 0
