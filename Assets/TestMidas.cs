@@ -37,7 +37,7 @@ public class TestMidas : MonoBehaviour
 		yield return Application.RequestUserAuthorization(UserAuthorization.WebCam);
 		if (!Application.HasUserAuthorization(UserAuthorization.WebCam))
 		{
-			Debug.Log("カメラの許可が必要");
+			yield break;
 		}
 
 		WebCamDevice device = WebCamTexture.devices[0];
