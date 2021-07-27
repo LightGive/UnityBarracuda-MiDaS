@@ -17,8 +17,10 @@ public class TestMidas : MonoBehaviour
 	[SerializeField]
 	private ComputeShader preProcessShader;
 	[SerializeField]
-	private ComputeShader postProcessShader;
-
+	private RenderTextureFormat format;
+	[SerializeField]
+	private float scale;
+	private Color[] tmpColor = new Color[256 * 256];
 	private ComputeBuffer tensorBuffer;
 	private RenderTexture depthTex = null;
 	private WebCamTexture webCamTexture = null;
@@ -42,13 +44,10 @@ public class TestMidas : MonoBehaviour
 		webCamTexture = new WebCamTexture(device.name);
 		debugNormalImage.texture = webCamTexture;
 		webCamTexture.Play();
-
 		woker = ModelLoader.Load(model).CreateWorker();
 		tensorBuffer = new ComputeBuffer(ImageSize * ImageSize * 3, sizeof(float));
-
-		depthTex = new RenderTexture(256, 256, 0, RenderTextureFormat.ARGBFloat);
+		depthTex = new RenderTexture(256, 256,0, format);
 		depthImage.texture = depthTex;
-
 	}
 
 
@@ -59,31 +58,32 @@ public class TestMidas : MonoBehaviour
 			return;
 		}
 
-		//var input = new Tensor(1, ImageSize, ImageSize, 3);
 		int kernelID = preProcessShader.FindKernel("Preprocess");
 		preProcessShader.SetTexture(kernelID, "_Texture", webCamTexture);
 		preProcessShader.SetBuffer(kernelID, "_Tensor", tensorBuffer);
 		preProcessShader.Dispatch(kernelID, ImageSize / 8, ImageSize / 8, 1);
-
 		using (var tensor = new Tensor(1, ImageSize, ImageSize, 3, tensorBuffer))
         {
 			woker.Execute(tensor);
         }
 
-		var output = woker.PeekOutput();
-		var tex = output.ToRenderTexture(0, 0, 1.0f / 32, 0.5f);
-		Graphics.Blit(tex, depthTex);
-		Destroy(tex);
+		var reshape = new TensorShape(1, 1, 1, 1, 1, ImageSize, ImageSize, 1);
+		var reshapedRT = RenderTexture.GetTemporary(reshape.width, reshape.height, 0, format);
+		using (var tensor = woker.PeekOutput().Reshape(reshape))
+		{
+			tensor.ToRenderTexture(reshapedRT, 0, 0, 1.0f / scale, 0);
+		}
+
+		Graphics.Blit(reshapedRT, depthTex);
+		RenderTexture.ReleaseTemporary(reshapedRT);
 	}
 
-    private void OnDestroy()
+	private void OnDestroy()
     {
 		tensorBuffer?.Dispose();
 		tensorBuffer = null;
-
 		woker?.Dispose();
 		woker = null;
-
 		depthTex = null;
     }
 }
