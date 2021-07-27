@@ -20,7 +20,9 @@ public class TestMidas : MonoBehaviour
 	private RenderTextureFormat format;
 	[SerializeField]
 	private float scale;
-	private Color[] tmpColor = new Color[256 * 256];
+	[SerializeField]
+	private int startWebcamNo;
+
 	private ComputeBuffer tensorBuffer;
 	private RenderTexture depthTex = null;
 	private WebCamTexture webCamTexture = null;
@@ -28,7 +30,7 @@ public class TestMidas : MonoBehaviour
 
 	IEnumerator Start()
 	{
-		if (WebCamTexture.devices.Length == 0)
+		if (WebCamTexture.devices.Length <= startWebcamNo)
 		{
 			Debug.Log("Cameraのデバイスが無い");
 			yield break;
@@ -40,7 +42,7 @@ public class TestMidas : MonoBehaviour
 			yield break;
 		}
 
-		WebCamDevice device = WebCamTexture.devices[0];
+		WebCamDevice device = WebCamTexture.devices[startWebcamNo];
 		webCamTexture = new WebCamTexture(device.name);
 		debugNormalImage.texture = webCamTexture;
 		webCamTexture.Play();
@@ -50,6 +52,20 @@ public class TestMidas : MonoBehaviour
 		depthImage.texture = depthTex;
 	}
 
+	private void Update()
+	{
+		if (!Input.GetMouseButtonDown(0))
+		{
+			return;
+		}
+
+		var p = Camera.main.ScreenToViewportPoint(Input.mousePosition);
+		var scale = (p.x > 0.5f) ?
+			new Vector3(-depthImage.transform.localScale.x, depthImage.transform.localScale.y, 1.0f) :
+			new Vector3(depthImage.transform.localScale.x, -depthImage.transform.localScale.y, 1.0f);
+		depthImage.transform.localScale = scale;
+		debugNormalImage.transform.localScale = scale;
+	}
 
 	private void LateUpdate()
 	{
@@ -67,13 +83,12 @@ public class TestMidas : MonoBehaviour
 			woker.Execute(tensor);
         }
 
-		var reshape = new TensorShape(1, 1, 1, 1, 1, ImageSize, ImageSize, 1);
+		var reshape = new TensorShape(1, ImageSize, ImageSize, 1);
 		var reshapedRT = RenderTexture.GetTemporary(reshape.width, reshape.height, 0, format);
 		using (var tensor = woker.PeekOutput().Reshape(reshape))
 		{
 			tensor.ToRenderTexture(reshapedRT, 0, 0, 1.0f / scale, 0);
 		}
-
 		Graphics.Blit(reshapedRT, depthTex);
 		RenderTexture.ReleaseTemporary(reshapedRT);
 	}
