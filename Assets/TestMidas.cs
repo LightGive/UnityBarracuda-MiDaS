@@ -2,7 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using Unity.Barracuda;
-using System.Linq;
 
 public class TestMidas : MonoBehaviour
 {
@@ -22,11 +21,14 @@ public class TestMidas : MonoBehaviour
 	private float scale;
 	[SerializeField]
 	private int startWebcamNo;
+	[SerializeField]
+	private int targetFPS;
 
-	private ComputeBuffer tensorBuffer;
-	private RenderTexture depthTex = null;
+	private ComputeBuffer tensorBuffer = null;
+	private RenderTexture tmpResultDepth = null;
+	private RenderTexture resultDepth = null;
 	private WebCamTexture webCamTexture = null;
-	private IWorker woker;
+	private IWorker woker = null;
 
 	IEnumerator Start()
 	{
@@ -39,17 +41,20 @@ public class TestMidas : MonoBehaviour
 		yield return Application.RequestUserAuthorization(UserAuthorization.WebCam);
 		if (!Application.HasUserAuthorization(UserAuthorization.WebCam))
 		{
+			Debug.LogError("Cameraを使用する権限が必要");
 			yield break;
 		}
 
 		WebCamDevice device = WebCamTexture.devices[startWebcamNo];
 		webCamTexture = new WebCamTexture(device.name);
-		debugNormalImage.texture = webCamTexture;
+		webCamTexture.requestedFPS = targetFPS;
 		webCamTexture.Play();
+		debugNormalImage.texture = webCamTexture;
 		woker = ModelLoader.Load(model).CreateWorker();
 		tensorBuffer = new ComputeBuffer(ImageSize * ImageSize * 3, sizeof(float));
-		depthTex = new RenderTexture(256, 256,0, format);
-		depthImage.texture = depthTex;
+		resultDepth = new RenderTexture(256, 256,0, format);
+		tmpResultDepth = new RenderTexture(ImageSize, ImageSize, 0, format);
+		depthImage.texture = resultDepth;
 	}
 
 	private void Update()
@@ -69,7 +74,7 @@ public class TestMidas : MonoBehaviour
 
 	private void LateUpdate()
 	{
-		if (webCamTexture == null || depthTex == null)
+		if (webCamTexture == null || resultDepth == null)
 		{
 			return;
 		}
@@ -84,21 +89,20 @@ public class TestMidas : MonoBehaviour
         }
 
 		var reshape = new TensorShape(1, ImageSize, ImageSize, 1);
-		var reshapedRT = RenderTexture.GetTemporary(reshape.width, reshape.height, 0, format);
 		using (var tensor = woker.PeekOutput().Reshape(reshape))
 		{
-			tensor.ToRenderTexture(reshapedRT, 0, 0, 1.0f / scale, 0);
+			tensor.ToRenderTexture(tmpResultDepth, 0, 0, 1.0f / scale, 0);
 		}
-		Graphics.Blit(reshapedRT, depthTex);
-		RenderTexture.ReleaseTemporary(reshapedRT);
+		Graphics.Blit(tmpResultDepth, resultDepth);
 	}
 
 	private void OnDestroy()
-    {
+	{
 		tensorBuffer?.Dispose();
 		tensorBuffer = null;
 		woker?.Dispose();
 		woker = null;
-		depthTex = null;
-    }
+		Destroy(resultDepth);
+		Destroy(tmpResultDepth);
+	}
 }

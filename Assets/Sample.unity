@@ -159,6 +159,7 @@ MonoBehaviour:
   format: 14
   scale: 1000
   startWebcamNo: 0
+  targetFPS: 15
 --- !u!4 &542072883
 Transform:
   m_ObjectHideFlags: 0
